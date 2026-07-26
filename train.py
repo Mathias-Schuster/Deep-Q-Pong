@@ -28,7 +28,7 @@ def train_dqn() -> None:
 
     print("Starting DQN training...")
 
-    for episode in range(EPISODES):
+    for episode in range(1, EPISODES + 1):
         state = torch.tensor(env.reset(), dtype=torch.float32)
         game_over = False
 
