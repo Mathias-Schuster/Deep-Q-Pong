@@ -17,7 +17,7 @@ GAMMA = 0.95
 EPISODES = 1000
 
 def train_dqn() -> None:
-    """Train a Deep Q-Network with basic experience replay."""
+    """Train a Deep Q-Network with batch optimized experience replay."""
     env = PongEnv()
     q_net = QNetwork()
     optimizer = optim.Adam(q_net.parameters(), lr=LR)
@@ -56,22 +56,33 @@ def train_dqn() -> None:
             # Experience replay
             if len(memory) > BATCH_SIZE:
                 minibatch = random.sample(memory, BATCH_SIZE)
-                
-                for m_state, m_action, m_reward, m_next_state, m_done in minibatch:
-                    target = m_reward
-                    if not m_done:
-                        with torch.no_grad():
-                            target = m_reward + GAMMA * torch.max(q_net(m_next_state)).item()
-                            
-                    current_q_values = q_net(m_state)
-                    target_q_values = current_q_values.clone()
-                    target_q_values[m_action] = target 
-                    
-                    loss = loss_fn(current_q_values, target_q_values)
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    
+
+                # Stack memories into tensors
+                m_states = torch.stack([m[0] for m in minibatch])
+                m_actions = torch.tensor([m[1] for m in minibatch])
+                m_rewards = torch.tensor([m[2] for m in minibatch], dtype=torch.float32)
+                m_next_states = torch.stack([m[3] for m in minibatch])
+                m_dones = torch.tensor([m[4] for m in minibatch], dtype=torch.bool)
+
+                # Predict Q-values for all states at once
+                current_q_values = q_net(m_states)
+                with torch.no_grad():
+                    next_q_values = q_net(m_next_states)
+
+                # Calculate Bellman targets
+                targets = current_q_values.clone()
+                for i in range(BATCH_SIZE):
+                    if m_dones[i]:
+                        targets[i, m_actions[i]] = m_rewards[i]
+                    else:
+                        targets[i, m_actions[i]] = m_rewards[i] + GAMMA * torch.max(next_q_values[i]).item()
+
+                # Single backpropagation pass
+                loss = loss_fn(current_q_values, targets)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
         if epsilon > EPSILON_MIN:
             epsilon *= EPSILON_DECAY
             
