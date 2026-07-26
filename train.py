@@ -15,11 +15,22 @@ EPSILON_MIN = 0.01
 EPSILON_DECAY = 0.995
 GAMMA = 0.95
 EPISODES = 1000
+TARGET_UPDATE_FREQ = 10 
 
 def train_dqn() -> None:
-    """Train a Deep Q-Network with batch optimized experience replay."""
+    """Train a Deep Q-Network training loop for the Pong agent.
+    
+    Implement an epsilon-greedy strategy for exploration, experience replay
+    batching for memory and a target network for stable learning. 
+    """
     env = PongEnv()
+
+    # Initialize target networks
     q_net = QNetwork()
+    target_net = QNetwork()
+    target_net.load_state_dict(q_net.state_dict())
+    target_net.eval()
+
     optimizer = optim.Adam(q_net.parameters(), lr=LR)
     loss_fn = nn.MSELoss()
 
@@ -64,10 +75,12 @@ def train_dqn() -> None:
                 m_next_states = torch.stack([m[3] for m in minibatch])
                 m_dones = torch.tensor([m[4] for m in minibatch], dtype=torch.bool)
 
-                # Predict Q-values for all states at once
+                # Predict Q-values for current states
                 current_q_values = q_net(m_states)
+
+                # Predict next Q-values using the target network
                 with torch.no_grad():
-                    next_q_values = q_net(m_next_states)
+                    next_q_values = target_net(m_next_states)
 
                 # Calculate Bellman targets
                 targets = current_q_values.clone()
@@ -85,6 +98,10 @@ def train_dqn() -> None:
 
         if epsilon > EPSILON_MIN:
             epsilon *= EPSILON_DECAY
+
+        # Target network update
+        if episode % TARGET_UPDATE_FREQ == 0:
+            target_net.load_state_dict(q_net.state_dict())
             
         if episode % 10 == 0:
             print(f"Episode {episode}/{EPISODES} | Score: {env.score} | Epsilon: {epsilon:.3f}")
