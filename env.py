@@ -47,9 +47,6 @@ class PongEnv:
     def step(self, action: Action) -> Tuple[List[int], int, bool]:
         """Advance the environment by one timestep based on the agent's action.
         
-        Update paddle position, ball position, handle collisions (wall/ceiling/paddle),
-        and determine the reward. The game ends if the ball hits the ground.
-
         Return the new state, the reward, and whether the game is over.
         """
         self.steps += 1
@@ -58,6 +55,9 @@ class PongEnv:
             self.paddle_x -= 1
         elif action == Action.RIGHT and self.paddle_x < self.width - 2:
             self.paddle_x += 1
+
+        if random.random() < 0.15:
+            self.ball_dx = random.choice([-1, 0, 1])    # random ball movement (wind)
 
         self.ball_x += self.ball_dx
         self.ball_y += self.ball_dy
@@ -100,7 +100,7 @@ class PongEnv:
 
     def render(self) -> None:
         """Render the current state of the environment to the console."""
-        print("\n" * 15)
+        print("\033[2J\033[H", end="")
         for y in range(self.height):
             row = ""
             for x in range(self.width):
