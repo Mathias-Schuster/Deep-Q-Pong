@@ -16,12 +16,36 @@ EPSILON_DECAY = 0.995
 GAMMA = 0.95
 EPISODES = 1000
 TARGET_UPDATE_FREQ = 10 
+EVAL_FREQ = 100
+EVAL_GAMES = 10
+
+def evaluate_model(model: QNetwork, env: PongEnv, num_games: int = EVAL_GAMES) -> float:
+    """Evaluate the model's performance without exploration and return its average score."""
+    total_score = 0.0
+
+    for _ in range(num_games):
+        state = torch.tensor(env.reset(), dtype=torch.float32)
+        game_over = False
+
+        while not game_over:
+            with torch.no_grad():
+                q_values = model(state)
+                action_val = torch.argmax(q_values).item()
+
+            action = Action(action_val)
+            next_state_list, _, game_over = env.step(action)
+            state = torch.tensor(next_state_list, dtype=torch.float32)
+
+        total_score += env.score
+
+    return total_score / num_games
 
 def train_dqn() -> None:
-    """Train a Deep Q-Network training loop for the Pong agent.
+    """Execute a Deep Q-Network training loop for the Pong agent.
     
     Implement an epsilon-greedy strategy for exploration, experience replay
     batching for memory and a target network for stable learning. 
+    Evaluate the model and checkpoint the best performing model periodically. 
     """
     env = PongEnv()
 
@@ -36,6 +60,7 @@ def train_dqn() -> None:
 
     memory = deque(maxlen=MEMORY_SIZE)
     epsilon = EPSILON_START
+    best_eval_score = 0.0
 
     print("Starting DQN training...")
 
@@ -61,10 +86,7 @@ def train_dqn() -> None:
             memory.append((state, action_val, reward, next_state, game_over))
             state = next_state
 
-            if episode % 50 == 0:
-                env.render()
-
-            # Experience replay
+            # Batch processing with target network
             if len(memory) > BATCH_SIZE:
                 minibatch = random.sample(memory, BATCH_SIZE)
 
@@ -75,7 +97,6 @@ def train_dqn() -> None:
                 m_next_states = torch.stack([m[3] for m in minibatch])
                 m_dones = torch.tensor([m[4] for m in minibatch], dtype=torch.bool)
 
-                # Predict Q-values for current states
                 current_q_values = q_net(m_states)
 
                 # Predict next Q-values using the target network
@@ -105,6 +126,19 @@ def train_dqn() -> None:
             
         if episode % 10 == 0:
             print(f"Episode {episode}/{EPISODES} | Score: {env.score} | Epsilon: {epsilon:.3f}")
+
+        # Model evaluation and Checkpointing
+        if episode % EVAL_FREQ == 0:
+            print(f"\n--- Pause training for evaluation at Episode {episode} ---")
+            avg_score = evaluate_model(q_net, env)
+            print(f"Average Eval Score: {avg_score:.1f}")
+            
+            if avg_score > best_eval_score:
+                best_eval_score = avg_score
+                torch.save(q_net.state_dict(), "best_model.pth")
+                print(f"New best model saved! (Average: {best_eval_score:.1f})\n")
+            else:
+                print(f"No improvement. (Best is still {best_eval_score:.1f})\n")
 
 if __name__ == "__main__":
     train_dqn()
