@@ -100,7 +100,8 @@ class PongEnv:
 
     def render(self) -> None:
         """Render the current state of the environment to the console."""
-        print("\033[2J\033[H", end="")
+        output = "\033[?25l"    # hide cursor
+
         for y in range(self.height):
             row = ""
             for x in range(self.width):
@@ -112,9 +113,15 @@ class PongEnv:
                     else: row += " > "
                 else:
                     row += " . "
-            print(row)
+            output += row + "\n"
+
+        output += f"Score: {self.score}\n" 
         
-        print(f"\nScore: {self.score}")
+        print(output, end="")
+
+        lines_to_clear = self.height + 1
+        print(f"\033[{lines_to_clear}A", end="", flush=True)
+
         time.sleep(0.01)
 
 
