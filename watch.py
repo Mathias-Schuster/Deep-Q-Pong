@@ -34,6 +34,10 @@ def watch_trained_agent(model_path: str = "best_model.pth") -> None:
         time.sleep(0.05)
     
     env.render()
+
+    # unhide cursor
+    lines_to_clear = env.height + 1
+    print(f"\033[{lines_to_clear}B\033[?25h", end="")
     
     print(f"\nGame Over! Final Score: {env.score}")
 
