@@ -3,6 +3,8 @@ import time
 from typing import List, Tuple
 from enum import IntEnum
 
+STEPS_MAX = 1000
+
 class Action(IntEnum):
     LEFT = 0
     STAY = 1
@@ -35,6 +37,7 @@ class PongEnv:
         
         self.game_over = False
         self.score = 0
+        self.steps = 0
         return self.get_state()
     
     def get_state(self) -> List[int]:
@@ -49,6 +52,8 @@ class PongEnv:
 
         Return the new state, the reward, and whether the game is over.
         """
+        self.steps += 1
+
         if action == Action.LEFT and self.paddle_x > 1:
             self.paddle_x -= 1
         elif action == Action.RIGHT and self.paddle_x < self.width - 2:
@@ -87,6 +92,10 @@ class PongEnv:
                 reward = -10
                 self.game_over = True
 
+        # Limit number of steps
+        if self.steps >= STEPS_MAX:
+            self.game_over = True
+
         return self.get_state(), reward, self.game_over
 
     def render(self) -> None:
@@ -106,7 +115,7 @@ class PongEnv:
             print(row)
         
         print(f"\nScore: {self.score}")
-        time.sleep(0.2)
+        time.sleep(0.01)
 
 
 # Test game manually
